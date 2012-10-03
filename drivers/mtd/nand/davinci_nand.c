@@ -145,7 +145,8 @@ static void nand_davinci_enable_hwecc(struct mtd_info *mtd, int mode)
 	dummy = emif_addr->NANDF3ECC;
 	dummy = emif_addr->NANDF4ECC;
 
-	emif_addr->NANDFCR |= (1 << (8 + region - 1)) | (1 << (region - 1));
+	//emif_addr->NANDFCR |= (1 << (8 + region - 1)) | (1 << (region - 1));
+	emif_addr->NANDFCR |= (1 << (9)) | (1 << (1));
 }
 #endif
 
@@ -157,6 +158,7 @@ static u_int32_t nand_davinci_readecc(struct mtd_info *mtd, u_int32_t region)
 
 	emif_base_addr = (emifregs)DAVINCI_ASYNC_EMIF_CNTRL_BASE;
 
+	#if 0
 	if (region == 1)
 		ecc = emif_base_addr->NANDF1ECC;
 	else if (region == 2)
@@ -164,7 +166,9 @@ static u_int32_t nand_davinci_readecc(struct mtd_info *mtd, u_int32_t region)
 	else if (region == 3)
 		ecc = emif_base_addr->NANDF3ECC;
 	else if (region == 4)
-		ecc = emif_base_addr->NANDF4ECC;
+		ecc = emif_base_addr->NANDF4ECC;	
+	#endif
+	ecc = emif_base_addr->NANDF2ECC;
 
 	return(ecc);
 }
@@ -217,7 +221,7 @@ static int nand_davinci_calculate_ecc(struct mtd_info *mtd, const u_char *dat, u
 static int nand_davinci_calculate_ecc(struct mtd_info *mtd, const u_char *dat, u_char *ecc_code)
 {
 	u_int32_t		tmp;
-	const int region = 1;
+	const int region = 2;
 
 	tmp = nand_davinci_readecc(mtd, region);
 
