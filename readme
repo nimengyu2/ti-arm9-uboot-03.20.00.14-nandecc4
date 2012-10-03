@@ -1,0 +1,66 @@
+history:
+2012-10-03  nmy create this file
+
+# 编译方法：
+CROSS_COMPILE=arm-none-linux-gnueabi-
+ARCH=arm
+# 彻底清除
+make CROSS_COMPILE=$CROSS_COMPILE ARCH=$ARCH distclean
+# 配置
+make CROSS_COMPILE=$CROSS_COMPILE ARCH=$ARCH da850evm_config
+# 编译uboot
+make CROSS_COMPILE=$CROSS_COMPILE ARCH=$ARCH all
+
+
+# uboot使用方法
+
+# 烧写ubl
+nandecc hw4
+nand erase 0x20000 0x20000
+mmc rescan 0;fatload mmc 0:1 0xc0700000  ubl_AM1808_NAND.bin
+nand write.e 0xc0700000  0x20000 0x20000
+# 集合
+nand erase 0x20000 0x20000;mmc rescan 0;fatload mmc 0:1 0xc0700000  ubl_AM1808_NAND.bin;nand write.e 0xc0700000  0x20000 0x20000
+
+# 烧写page，这个page中保存的是uboot.bin相关信息，比如uboot的长度，起始地址
+# 这个page必须读取自己编辑来
+nand erase 0xC0000 0xA0000
+mmc rescan 0;fatload mmc 0:1 0xc0700000  page1.bin
+nand write 0xc0700000 0xC0000 0x800 
+# 集合
+nand erase 0xC0000 0xA0000;mmc rescan 0;fatload mmc 0:1 0xc0700000  page1.bin;nand write 0xc0700000 0xC0000 0x800 
+
+# 烧写uboot
+mmc rescan 0;fatload mmc 0:1 0xc0700000  u-boot.bin
+nand write 0xc0700000 0xC0800 0x80000 
+# 集合
+mmc rescan 0;fatload mmc 0:1 0xc0700000  u-boot.bin;nand write 0xc0700000 0xC0800 0x80000
+
+
+# 烧写uImage
+nandecc hw1
+nand erase 0x200000 0x2F0000 
+mmc rescan 0;fatload mmc 0:1 0xc0700000 uImage
+nand write.e 0xc0700000 0x200000 0x2F0000 
+# 集合
+nand erase 0x200000 0x2F0000 ;mmc rescan 0;fatload mmc 0:1 0xc0700000 uImage;nand write.e 0xc0700000 0x200000 0x2F0000
+
+# ubi烧写方式
+mtdpart default 
+nand erase rootfs 
+mmc rescan 0;fatload mmc 0:1 0xc1400000 ubi.img 
+nand write 0xc1400000 rootfs 800000   
+# 集合
+mtdpart default;nand erase rootfs;mmc rescan 0;fatload mmc 0:1 0xc1400000 ubi.img;nand write 0xc1400000 rootfs 800000  
+
+# 设定启动参数
+setenv bootcmd 'nboot.e 0xc0700000 0 0x200000; bootm'
+setenv bootargs console=ttyS2,115200n8 noinitrd ubi.mtd=4 root=ubi0:rootfs rootfstype=ubifs  rootwait rw ip=192.168.1.57:192.168.1.56:192.168.1.1:255.255.255.0 init=/sbin/init
+saveenv;boot
+
+
+
+
+
+
+
