@@ -67,14 +67,116 @@ static u_char davinci_ecc_buf[NAND_MAX_OOBSIZE];
 
 extern struct nand_chip nand_dev_desc[CONFIG_SYS_MAX_NAND_DEVICE];
 
+
+/*
+ * Exploit the little endianness of the ARM to do multi-byte transfers
+ * per device read. This can perform over twice as quickly as individual
+ * byte transfers when buffer alignment is conducive.
+ *
+ * NOTE: This only works if the NAND is not connected to the 2 LSBs of
+ * the address bus. On Davinci EVM platforms this has always been true.
+ */
+static void nand_davinci_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+{
+	struct nand_chip *chip = mtd->priv;
+	const u32 *nand = chip->IO_ADDR_R;
+
+	/* Make sure that buf is 32 bit aligned */
+	if (((int)buf & 0x3) != 0) {
+		if (((int)buf & 0x1) != 0) {
+			if (len) {
+				*buf = readb(nand);
+				buf += 1;
+				len--;
+			}
+		}
+
+		if (((int)buf & 0x3) != 0) {
+			if (len >= 2) {
+				*(u16 *)buf = readw(nand);
+				buf += 2;
+				len -= 2;
+			}
+		}
+	}
+
+	/* copy aligned data */
+	while (len >= 4) {
+		*(u32 *)buf = readl(nand);
+		buf += 4;
+		len -= 4;
+	}
+
+	/* mop up any remaining bytes */
+	if (len) {
+		if (len >= 2) {
+			*(u16 *)buf = readw(nand);
+			buf += 2;
+			len -= 2;
+		}
+
+		if (len)
+			*buf = readb(nand);
+	}
+}
+
+static void nand_davinci_write_buf(struct mtd_info *mtd, const uint8_t *buf,
+				   int len)
+{
+	struct nand_chip *chip = mtd->priv;
+	const u32 *nand = chip->IO_ADDR_W;
+
+	/* Make sure that buf is 32 bit aligned */
+	if (((int)buf & 0x3) != 0) {
+		if (((int)buf & 0x1) != 0) {
+			if (len) {
+				writeb(*buf, nand);
+				buf += 1;
+				len--;
+			}
+		}
+
+		if (((int)buf & 0x3) != 0) {
+			if (len >= 2) {
+				writew(*(u16 *)buf, nand);
+				buf += 2;
+				len -= 2;
+			}
+		}
+	}
+
+	/* copy aligned data */
+	while (len >= 4) {
+		writel(*(u32 *)buf, nand);
+		buf += 4;
+		len -= 4;
+	}
+
+	/* mop up any remaining bytes */
+	if (len) {
+		if (len >= 2) {
+			writew(*(u16 *)buf, nand);
+			buf += 2;
+			len -= 2;
+		}
+
+		if (len)
+			writeb(*buf, nand);
+	}
+}
+
+
+
+
 static void nand_davinci_hwcontrol(struct mtd_info *mtd, int cmd, unsigned int ctrl)
 {
 	struct		nand_chip *this = mtd->priv;
 	u_int32_t	IO_ADDR_W = (u_int32_t)this->IO_ADDR_W;
 
-	IO_ADDR_W &= ~(MASK_ALE|MASK_CLE);
-
 	if (ctrl & NAND_CTRL_CHANGE) {
+		// nmy modify
+		IO_ADDR_W &= ~(MASK_ALE|MASK_CLE);
+
 		if ( ctrl & NAND_CLE )
 			IO_ADDR_W |= MASK_CLE;
 		if ( ctrl & NAND_ALE )
@@ -253,6 +355,7 @@ static int nand_davinci_calculate_ecc(struct mtd_info *mtd, const u_char *dat, u
 }
 
 #ifdef CONFIG_SYS_DAVINCI_BROKEN_ECC
+#if 0
 static void nand_davinci_gen_true_ecc(u_int8_t *ecc_buf)
 {
 	u_int32_t	tmp = ecc_buf[0] | (ecc_buf[1] << 16) | ((ecc_buf[2] & 0xf0) << 20) | ((ecc_buf[2] & 0x0f) << 8);
@@ -369,6 +472,7 @@ static int nand_davinci_compare_ecc(u_int8_t *ecc_nand, u_int8_t *ecc_calc, u_in
 			return(-1);
 	}
 }
+#endif
 #endif /* CONFIG_SYS_DAVINCI_BROKEN_ECC */
 
 
@@ -1057,7 +1161,7 @@ int davinci_nand_init(struct nand_chip *nand)
 #ifdef CONFIG_SYS_NAND_HW_ECC
 	nand->ecc.mode = NAND_ECC_HW;
 #ifdef CONFIG_SYS_DAVINCI_BROKEN_ECC
-	nand->ecc.layout  = &davinci_nand_ecclayout;
+	//nand->ecc.layout  = &davinci_nand_ecclayout;
 #ifdef CONFIG_SYS_NAND_LARGEPAGE
 	nand->ecc.size = 2048;
 	nand->ecc.bytes = 12;
@@ -1109,6 +1213,9 @@ int davinci_nand_init(struct nand_chip *nand)
 #endif
 	/* Set address of hardware control function */
 	nand->cmd_ctrl = nand_davinci_hwcontrol;
+	
+	nand->read_buf = nand_davinci_read_buf;
+	nand->write_buf = nand_davinci_write_buf;
 
 	nand->dev_ready = nand_davinci_dev_ready;
 	nand->waitfunc = nand_davinci_waitfunc;
@@ -1172,7 +1279,7 @@ void davinci_nand_switch_ecc(int32_t hardware)
 		#ifdef CONFIG_SYS_NAND_HW_ECC
 			nand->ecc.mode = NAND_ECC_HW;
 		#ifdef CONFIG_SYS_DAVINCI_BROKEN_ECC
-			nand->ecc.layout  = &davinci_nand_ecclayout;
+			//nand->ecc.layout  = &davinci_nand_ecclayout;
 		#ifdef CONFIG_SYS_NAND_LARGEPAGE
 			nand->ecc.size = 2048;
 			nand->ecc.bytes = 12;

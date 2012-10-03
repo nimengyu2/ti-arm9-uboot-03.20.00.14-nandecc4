@@ -10,13 +10,18 @@ case "$1" in
         make CROSS_COMPILE=$CROSS_COMPILE ARCH=$ARCH distclean
         echo "."
         ;;
+    config)
+        echo -n "Starting $SRC make $1"
+        make CROSS_COMPILE=$CROSS_COMPILE ARCH=$ARCH da850evm_config;
+        echo "."
+        ;;
     uboot)
         echo -n "Starting $SRC make $1"
-        make CROSS_COMPILE=$CROSS_COMPILE ARCH=$ARCH da850evm_config;make CROSS_COMPILE=$CROSS_COMPILE ARCH=$ARCH all
+        make CROSS_COMPILE=$CROSS_COMPILE ARCH=$ARCH all
         echo "."
         ;;
     *)
-        echo "Usage: $0 {clean|uboot}"
+        echo "Usage: $0 {clean|uboot|config}"
         exit 1
         ;;
 esac
