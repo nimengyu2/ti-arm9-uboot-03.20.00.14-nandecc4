@@ -1161,6 +1161,8 @@ int davinci_nand_init(struct nand_chip *nand)
 #ifdef CONFIG_SYS_NAND_HW_ECC
 	nand->ecc.mode = NAND_ECC_HW;
 #ifdef CONFIG_SYS_DAVINCI_BROKEN_ECC
+	// 问题就出在这里，如果不使用默认的，而在这里添加的话，烧写uimage都不行
+	// saveenv都会crc错误
 	//nand->ecc.layout  = &davinci_nand_ecclayout;
 #ifdef CONFIG_SYS_NAND_LARGEPAGE
 	nand->ecc.size = 2048;
