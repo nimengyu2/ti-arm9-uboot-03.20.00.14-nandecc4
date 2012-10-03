@@ -131,6 +131,7 @@ static struct nand_ecclayout davinci_nand_ecclayout = {
 #endif
 #endif /* CONFIG_SYS_DAVINCI_BROKEN_ECC */
 
+#if 1
 static void nand_davinci_enable_hwecc(struct mtd_info *mtd, int mode)
 {
 	emifregs	emif_addr;
@@ -146,6 +147,8 @@ static void nand_davinci_enable_hwecc(struct mtd_info *mtd, int mode)
 
 	emif_addr->NANDFCR |= (1 << (8 + region - 1)) | (1 << (region - 1));
 }
+#endif
+
 
 static u_int32_t nand_davinci_readecc(struct mtd_info *mtd, u_int32_t region)
 {
@@ -166,6 +169,7 @@ static u_int32_t nand_davinci_readecc(struct mtd_info *mtd, u_int32_t region)
 	return(ecc);
 }
 
+#if 0
 static int nand_davinci_calculate_ecc(struct mtd_info *mtd, const u_char *dat, u_char *ecc_code)
 {
 	u_int32_t		tmp;
@@ -208,6 +212,40 @@ static int nand_davinci_calculate_ecc(struct mtd_info *mtd, const u_char *dat, u
 	*ecc_code++ = tmp >> 16;
 #endif /* CONFIG_SYS_DAVINCI_BROKEN_ECC */
 	return(0);
+}
+#endif
+static int nand_davinci_calculate_ecc(struct mtd_info *mtd, const u_char *dat, u_char *ecc_code)
+{
+	u_int32_t		tmp;
+	const int region = 1;
+
+	tmp = nand_davinci_readecc(mtd, region);
+
+	/* Squeeze 4 bytes ECC into 3 bytes by removing RESERVED bits
+	 * and shifting. RESERVED bits are 31 to 28 and 15 to 12. */
+	tmp = (tmp & 0x00000fff) | ((tmp & 0x0fff0000) >> 4);
+
+	/* Invert so that erased block ECC is correct */
+	tmp = ~tmp;
+
+	*ecc_code++ = tmp;
+	*ecc_code++ = tmp >>  8;
+	*ecc_code++ = tmp >> 16;
+
+	/* NOTE:  the above code matches mainline Linux:
+	 *	.PQR.stu ==> ~PQRstu
+	 *
+	 * MontaVista/TI kernels encode those bytes differently, use
+	 * complicated (and allegedly sometimes-wrong) correction code,
+	 * and usually shipped with U-Boot that uses software ECC:
+	 *	.PQR.stu ==> PsQRtu
+	 *
+	 * If you need MV/TI compatible NAND I/O in U-Boot, it should
+	 * be possible to (a) change the mangling above, (b) reverse
+	 * that mangling in nand_davinci_correct_data() below.
+	 */
+
+	return 0;
 }
 
 #ifdef CONFIG_SYS_DAVINCI_BROKEN_ECC
@@ -329,6 +367,8 @@ static int nand_davinci_compare_ecc(u_int8_t *ecc_nand, u_int8_t *ecc_calc, u_in
 }
 #endif /* CONFIG_SYS_DAVINCI_BROKEN_ECC */
 
+
+#if 0
 static int nand_davinci_correct_data(struct mtd_info *mtd, u_char *dat, u_char *read_ecc, u_char *calc_ecc)
 {
 	struct nand_chip *this = mtd->priv;
@@ -384,6 +424,49 @@ static int nand_davinci_correct_data(struct mtd_info *mtd, u_char *dat, u_char *
 #endif /* CONFIG_SYS_DAVINCI_BROKEN_ECC */
 	return(0);
 }
+#endif
+
+
+static int nand_davinci_correct_data(struct mtd_info *mtd, u_char *dat, u_char *read_ecc, u_char *calc_ecc)
+{
+	struct nand_chip *this = mtd->priv;
+	u_int32_t ecc_nand = read_ecc[0] | (read_ecc[1] << 8) |
+					  (read_ecc[2] << 16);
+	u_int32_t ecc_calc = calc_ecc[0] | (calc_ecc[1] << 8) |
+					  (calc_ecc[2] << 16);
+	u_int32_t diff = ecc_calc ^ ecc_nand;
+
+	if (diff) {
+		if ((((diff >> 12) ^ diff) & 0xfff) == 0xfff) {
+			/* Correctable error */
+			if ((diff >> (12 + 3)) < this->ecc.size) {
+				uint8_t find_bit = 1 << ((diff >> 12) & 7);
+				uint32_t find_byte = diff >> (12 + 3);
+
+				dat[find_byte] ^= find_bit;
+				MTDDEBUG(MTD_DEBUG_LEVEL0, "Correcting single "
+					 "bit ECC error at offset: %d, bit: "
+					 "%d\n", find_byte, find_bit);
+				return 1;
+			} else {
+				return -1;
+			}
+		} else if (!(diff & (diff - 1))) {
+			/* Single bit ECC error in the ECC itself,
+			   nothing to fix */
+			MTDDEBUG(MTD_DEBUG_LEVEL0, "Single bit ECC error in "
+				 "ECC.\n");
+			return 1;
+		} else {
+			/* Uncorrectable error */
+			MTDDEBUG(MTD_DEBUG_LEVEL0, "ECC UNCORRECTED_ERROR 1\n");
+			return -1;
+		}
+	}
+	return(0);
+}
+
+
 #endif /* CONFIG_SYS_NAND_HW_ECC */
 
 #ifdef CONFIG_SYS_NAND_4BIT_HW_ECC_OOBFIRST

@@ -84,6 +84,7 @@ typedef struct  {
 	u_int32_t	CE3CLE;
 } nand_registers;
 
+
 typedef volatile nand_registers	*nandregs;
 
 #define NAND_READ_START		0x00
