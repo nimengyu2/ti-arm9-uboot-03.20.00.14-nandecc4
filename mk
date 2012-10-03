@@ -7,7 +7,7 @@ DEFAULT_CONFIG=""
 case "$1" in
     clean)
         echo -n "Starting $SRC make $1"
-        make CROSS_COMPILE=$CROSS_COMPILE ARCH=$ARCH disclean
+        make CROSS_COMPILE=$CROSS_COMPILE ARCH=$ARCH distclean
         echo "."
         ;;
     uboot)

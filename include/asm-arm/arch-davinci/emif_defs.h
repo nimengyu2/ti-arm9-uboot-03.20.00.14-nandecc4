@@ -51,7 +51,13 @@ typedef struct {
 	dv_reg		NANDFCR;
 	dv_reg		NANDFSR;
 	u_int8_t	RSVD1[8];
-	dv_reg		NANDFECC[4];
+	// nmy modify
+	//dv_reg		NANDFECC[4];
+	dv_reg		NANDF1ECC;
+	dv_reg		NANDF2ECC;
+	dv_reg		NANDF3ECC;
+	dv_reg		NANDF4ECC;
+
 	u_int8_t	RSVD2[60];
 	dv_reg		NAND4BITECCLOAD;
 	dv_reg		NAND4BITECC1;

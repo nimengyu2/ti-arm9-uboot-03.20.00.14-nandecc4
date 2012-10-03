@@ -987,10 +987,12 @@ int davinci_nand_init(struct nand_chip *nand)
 	nand->ecc.calculate = nand_davinci_calculate_ecc;
 	nand->ecc.correct  = nand_davinci_correct_data;
 	nand->ecc.hwctl  = nand_davinci_enable_hwecc;
+	printf("HW ECC1 selected\n");
 #else
 	nand->ecc.mode = NAND_ECC_SOFT;
 #endif /* CONFIG_SYS_NAND_HW_ECC */
 
+#if 0
 #ifdef CONFIG_SYS_NAND_4BIT_HW_ECC_OOBFIRST
 	nand->ecc.mode = NAND_ECC_HW_SYNDROME;
 	nand->ecc.size = 512;
@@ -1014,7 +1016,9 @@ int davinci_nand_init(struct nand_chip *nand)
 	nand->ecc.write_page = davinci_write_page_syndrome;
 	nand->options |= NAND_USE_FLASH_BBT | NAND_USE_DATA_ADJACENT_OOB;
 #endif
+	printf("HW ECC4 selected\n");
 
+#endif
 #endif
 	/* Set address of hardware control function */
 	nand->cmd_ctrl = nand_davinci_hwcontrol;
@@ -1049,13 +1053,12 @@ void davinci_nand_switch_ecc(int32_t hardware)
 	mtd = &nand_info[nand_curr_device];
 	nand = mtd->priv;
 
-	nand->options |= NAND_OWN_BUFFERS;
-
 	/* Reset ecc interface */
 	memset(&nand->ecc, 0, sizeof nand->ecc);
 
 	/* Setup the ecc configurations again */
-	if (hardware) {
+	if (hardware == 1) {
+		nand->options |= NAND_OWN_BUFFERS;
 		nand->ecc.mode = NAND_ECC_HW_SYNDROME;
 		nand->ecc.size = 512;
 		nand->ecc.bytes = 10;
@@ -1072,7 +1075,37 @@ void davinci_nand_switch_ecc(int32_t hardware)
 		nand->ecc.write_page = davinci_std_write_page_syndrome;
 		nand->ecc.read_oob = davinci_std_read_oob_syndrome;
 		nand->ecc.write_oob = davinci_std_write_oob_syndrome;
-		printf("HW ECC selected\n");
+		printf("HW ECC4 selected\n");
+	} 
+	else if(hardware == 2)
+	{
+		#ifdef CONFIG_SYS_NAND_USE_FLASH_BBT
+			nand->options	  |= NAND_USE_FLASH_BBT;
+		#endif
+		#ifdef CONFIG_SYS_NAND_HW_ECC
+			nand->ecc.mode = NAND_ECC_HW;
+		#ifdef CONFIG_SYS_DAVINCI_BROKEN_ECC
+			nand->ecc.layout  = &davinci_nand_ecclayout;
+		#ifdef CONFIG_SYS_NAND_LARGEPAGE
+			nand->ecc.size = 2048;
+			nand->ecc.bytes = 12;
+		#elif defined(CONFIG_SYS_NAND_SMALLPAGE)
+			nand->ecc.size = 512;
+			nand->ecc.bytes = 3;
+		#else
+		#error "Either CONFIG_SYS_NAND_LARGEPAGE or CONFIG_SYS_NAND_SMALLPAGE must be defined!"
+		#endif
+		#else
+			nand->ecc.size = 512;
+			nand->ecc.bytes = 3;
+		#endif /* CONFIG_SYS_DAVINCI_BROKEN_ECC */
+			nand->ecc.calculate = nand_davinci_calculate_ecc;
+			nand->ecc.correct  = nand_davinci_correct_data;
+			nand->ecc.hwctl  = nand_davinci_enable_hwecc;
+		#else
+			nand->ecc.mode = NAND_ECC_SOFT;
+		#endif /* CONFIG_SYS_NAND_HW_ECC */
+		printf("HW ECC1 selected\n");
 	} else {
 		nand->ecc.mode = NAND_ECC_SOFT;
 		/* Use mtd default settings */
